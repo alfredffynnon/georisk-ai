@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 
+export const maxDuration = 60;
+
 const SYSTEM_PROMPT =
   "You are a senior geopolitical risk analyst. Given a client portfolio and a library of geopolitical scenarios and transmission mechanisms, produce a structured exposure brief. Be specific to the portfolio's sector, geography, and assets. Return ONLY valid JSON — no prose, no markdown, no code fences.";
 
@@ -113,9 +115,10 @@ export async function POST(request: Request) {
   try {
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
+      timeout: 50000,
     });
 
-    const response = await anthropic.messages.create({
+    const message = await anthropic.messages.create({
       max_tokens: 4000,
       messages: [
         {
@@ -131,13 +134,28 @@ export async function POST(request: Request) {
       system: SYSTEM_PROMPT,
     });
 
-    const responseText = response.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("")
+    const raw =
+      message.content[0].type === "text" ? message.content[0].text : "";
+    const cleaned = raw
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/```\s*$/i, "")
       .trim();
 
-    parsedBrief = parseExposureBrief(responseText);
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (error) {
+      console.error("Failed to parse AI response", { error, raw });
+
+      return NextResponse.json(
+        { error: "Failed to parse AI response" },
+        { status: 500 },
+      );
+    }
+
+    parsedBrief = parseExposureBrief(parsed);
   } catch {
     return NextResponse.json(
       { error: "Claude brief generation failed." },
@@ -180,9 +198,7 @@ function buildUserMessage(
   ].join("\n\n");
 }
 
-function parseExposureBrief(responseText: string): ExposureBrief {
-  const parsed = JSON.parse(responseText) as unknown;
-
+function parseExposureBrief(parsed: unknown): ExposureBrief {
   if (!isExposureBrief(parsed)) {
     throw new Error("Claude returned an invalid exposure brief shape.");
   }
