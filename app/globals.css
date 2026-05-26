@@ -4,30 +4,34 @@
 
 @layer base {
   :root {
-    --background: 222 47% 5%;
+    --background: 216 60% 10%;
     --foreground: 210 40% 98%;
-    --card: 222 47% 7%;
+    --card: 219 61% 15%;
     --card-foreground: 210 40% 98%;
-    --popover: 222 47% 7%;
+    --popover: 219 61% 15%;
     --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222 47% 7%;
-    --secondary: 215 28% 17%;
+    --primary: 226 71% 40%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 219 50% 18%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 215 28% 17%;
+    --muted: 219 42% 22%;
     --muted-foreground: 215 20% 72%;
     --accent: 205 100% 56%;
-    --accent-foreground: 222 47% 5%;
+    --accent-foreground: 216 60% 10%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
-    --border: 215 28% 20%;
-    --input: 215 28% 20%;
+    --border: 217 45% 24%;
+    --input: 217 45% 24%;
     --ring: 205 100% 56%;
     --radius: 0.5rem;
   }
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   * {
     @apply border-border;
   }
