@@ -1,11 +1,47 @@
+export type RiskLabel = "Stable" | "Guarded" | "Elevated" | "High" | "Critical";
+
+export interface CountryBriefScenario {
+  name: string;
+  description: string;
+  base_case_probability: number;
+  adverse_probability: number;
+  client_impact: string;
+}
+
+export interface CountryBriefMetric {
+  label: string;
+  value: string;
+  implication: string;
+}
+
+export interface CountryBriefTrigger {
+  signal: string;
+  threshold: string;
+  action: string;
+}
+
+export interface CountryBriefAction {
+  action: string;
+  timeframe: "immediate" | "30-days" | "90-days";
+  priority: "high" | "medium";
+}
+
 export interface BriefContent {
-  country_summary: string;
-  relevant_scenarios: string[];
+  risk_rating: {
+    score: number;
+    label: RiskLabel;
+    summary: string;
+  };
+  scenarios: CountryBriefScenario[];
   transmission_channels: string[];
-  economic_exposure: string;
+  economic_exposure: {
+    narrative: string;
+    key_metrics: CountryBriefMetric[];
+  };
   diligence_questions: string[];
-  monitoring_triggers: string[];
-  recommended_actions: string[];
+  monitoring_triggers: CountryBriefTrigger[];
+  recommended_actions: CountryBriefAction[];
+  sources_used: string[];
 }
 
 export interface CompanyProfile {
