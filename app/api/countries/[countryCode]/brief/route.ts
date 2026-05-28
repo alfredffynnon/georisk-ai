@@ -24,7 +24,7 @@ type CountryBriefRouteProps = {
 };
 
 const systemPrompt =
-  "You are a senior geopolitical risk analyst at a top-tier political risk consultancy. Your briefs are used by investment committees at infrastructure funds and private credit managers to make capital allocation decisions. Write with the authority and precision of a Control Risks or Oxford Analytica report. Every claim must reference a specific source or data point. Return only raw valid JSON — no markdown, no fences.";
+  "You are a senior geopolitical risk analyst at a top-tier political risk consultancy. Your briefs are used by investment committees at infrastructure funds and private credit managers to make capital allocation decisions. Write with the authority and precision of a Control Risks or Oxford Analytica report. Every claim must reference a specific source or data point. Return only raw valid JSON — no markdown, no fences. You MUST respond with ONLY a valid JSON object. No preamble, no explanation, no markdown code fences. Your entire response must be directly parseable by JSON.parse().";
 
 export async function POST(
   _request: NextRequest,
@@ -238,19 +238,17 @@ function parseBriefContent(rawText: string): BriefContent | null {
 }
 
 function cleanJsonText(text: string): string {
-  let s = text.trim();
-
-  if (s.startsWith("```json")) {
-    s = s.slice(7);
-  } else if (s.startsWith("```")) {
-    s = s.slice(3);
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) {
+    return fenceMatch[1].trim();
   }
 
-  if (s.endsWith("```")) {
-    s = s.slice(0, -3);
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return jsonMatch[0];
   }
 
-  return s.trim();
+  return text.trim();
 }
 
 function formatCurrencyExposure(currencyExposure: string[] | null) {
