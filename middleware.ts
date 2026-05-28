@@ -6,14 +6,18 @@ import {
   hasSupabaseConfig,
 } from "@/lib/supabase/config";
 
-const PROTECTED_ROUTE_PREFIXES = ["/dashboard", "/alerts"] as const;
-const PROTECTED_EXACT_ROUTES = ["/onboarding", "/experts"] as const;
+const PROTECTED_ROUTE_PREFIXES = [
+  "/dashboard",
+  "/alerts",
+  "/onboarding",
+  "/experts",
+] as const;
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isProtectedRoute = isProtectedPath(pathname);
   const isDashboardRoute = matchesRoutePrefix(pathname, "/dashboard");
-  const isOnboardingRoute = pathname === "/onboarding";
+  const isOnboardingRoute = matchesRoutePrefix(pathname, "/onboarding");
 
   if (!hasSupabaseConfig()) {
     return isProtectedRoute ? redirectToLogin(request) : NextResponse.next();
@@ -87,9 +91,8 @@ export const config = {
 };
 
 function isProtectedPath(pathname: string) {
-  return (
-    PROTECTED_EXACT_ROUTES.some((route) => pathname === route) ||
-    PROTECTED_ROUTE_PREFIXES.some((prefix) => matchesRoutePrefix(pathname, prefix))
+  return PROTECTED_ROUTE_PREFIXES.some((prefix) =>
+    matchesRoutePrefix(pathname, prefix)
   );
 }
 

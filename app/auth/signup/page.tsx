@@ -24,7 +24,7 @@ export default function SignUpPage({ searchParams }: SignUpPageProps) {
     let errorMessage: string | null = null;
 
     try {
-      const supabase = createClient();
+      const supabase = await createClient();
       const { error } = await supabase.auth.signUp({
         email,
         password,

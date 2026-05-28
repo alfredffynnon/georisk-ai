@@ -39,7 +39,7 @@ export async function GET(
       return response;
     }
 
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: messages, error: messagesError } = await supabase
       .from("chat_messages")
       .select("id, user_id, country_code, role, content, created_at")
@@ -107,7 +107,7 @@ export async function POST(
         role: historyMessage.role,
       }));
 
-    const supabase = createClient();
+    const supabase = await createClient();
     const { error: userMessageError } = await supabase
       .from("chat_messages")
       .insert({
@@ -214,7 +214,7 @@ export async function POST(
 }
 
 async function authenticateCountryRequest(countryCodeParam: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
     error: authError,

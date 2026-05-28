@@ -28,7 +28,7 @@ export async function POST(
   { params }: CountryBriefRouteProps,
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
       error: authError,

@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 async function signOut() {
   "use server";
 
-  const supabase = createClient();
+  const supabase = await createClient();
   await supabase.auth.signOut();
 
   redirect("/auth/login");
@@ -21,7 +21,7 @@ async function getCurrentUser() {
   }
 
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

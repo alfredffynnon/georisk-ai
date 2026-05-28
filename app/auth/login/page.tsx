@@ -25,7 +25,7 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
     let errorMessage: string | null = null;
 
     try {
-      const supabase = createClient();
+      const supabase = await createClient();
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
