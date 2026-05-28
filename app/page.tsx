@@ -126,6 +126,24 @@ const useCases = [
   },
 ];
 
+const featureCallouts = [
+  {
+    description:
+      "Continuously scans geopolitical developments across monitored markets.",
+    title: "Live Signal Detection",
+  },
+  {
+    description:
+      "Maps events to the assets, counterparties, and supply chains you care about.",
+    title: "Company-Specific Translation",
+  },
+  {
+    description:
+      "Escalate complex questions to former policymakers and regional specialists.",
+    title: "Expert Network Access",
+  },
+];
+
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Home() {
@@ -195,13 +213,12 @@ export default function Home() {
       <section className="mx-auto flex min-h-[calc(88vh-4rem)] w-full max-w-6xl flex-col justify-center gap-10 px-6 py-16 sm:py-20">
         <div className="flex max-w-5xl flex-col gap-7">
           <h1 className="max-w-5xl text-4xl font-semibold leading-tight tracking-normal text-foreground sm:text-6xl lg:text-7xl">
-            Know exactly which geopolitical events threaten your portfolio.
-            Before they hit consensus.
+            Know what&apos;s happening in your markets before it makes the
+            news
           </h1>
           <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-xl sm:leading-9">
-            GeoRisk AI translates live geopolitical developments into
-            structured business risk briefs built for infrastructure funds,
-            energy investors, and private credit managers.
+            Real-time geopolitical intelligence, translated into the specific
+            risk exposure of your portfolio
           </p>
         </div>
 
@@ -224,6 +241,23 @@ export default function Home() {
 
         <div className="border-y border-white/10 py-4 text-sm font-medium text-muted-foreground">
           Built at Harvard · Institute of Politics · Backed by EasyA
+        </div>
+      </section>
+
+      <section className="px-6 pb-14">
+        <div className="mx-auto grid w-full max-w-6xl gap-4 md:grid-cols-3">
+          {featureCallouts.map((feature) => (
+            <Card key={feature.title}>
+              <CardHeader>
+                <CardTitle>{feature.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {feature.description}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </section>
 

@@ -59,6 +59,18 @@ export default async function DashboardPage() {
           </div>
 
           <nav className="flex flex-col gap-2 sm:flex-row lg:justify-end">
+            <Link
+              className="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+              href="/alerts"
+            >
+              Alerts
+            </Link>
+            <Link
+              className="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+              href="/experts"
+            >
+              Experts
+            </Link>
             <Button
               asChild
               className="border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08] hover:text-white"
