@@ -24,6 +24,10 @@ type ScoredArticle = {
   category: SignalCategory;
 };
 
+type BatchScoredArticle = ScoredArticle & {
+  index: number;
+};
+
 type SignalCategory = "economic" | "political" | "jurisdiction" | "security";
 
 type TaggedArticle = NewsApiArticle & {
@@ -84,10 +88,10 @@ export async function GET() {
       timeout: 45000,
     });
 
-    const scoredSignals = await Promise.all(
-      articles.map((article) =>
-        scoreArticleForProfile(anthropic, companyProfile, article),
-      ),
+    const scoredSignals = await scoreArticlesForProfile(
+      anthropic,
+      companyProfile,
+      articles,
     );
 
     const signals = scoredSignals
@@ -155,21 +159,22 @@ async function fetchCountryArticles(countryCode: CountryCode) {
     }));
 }
 
-async function scoreArticleForProfile(
+async function scoreArticlesForProfile(
   anthropic: Anthropic,
   profile: CompanyProfile,
-  article: TaggedArticle,
+  articles: TaggedArticle[],
 ) {
+  if (articles.length === 0) {
+    return [];
+  }
+
   try {
     const message = await anthropic.messages.create({
-      max_tokens: 256,
+      max_tokens: Math.min(Math.max(512, articles.length * 96), 4000),
       messages: [
         {
           role: "user",
-          content: `Company: ${profile.company_name}. Industry: ${profile.industry_vertical}. Key assets: ${profile.key_assets ?? "Not specified"}. Supply chain: ${profile.supply_chain ?? "Not specified"}.
-Article headline: ${article.title}. Summary: ${article.description ?? "No summary provided"}.
-Rate relevance of this article to this company's risk exposure.
-Return ONLY JSON: {score: 1-5, reason: string max 12 words, category: 'economic'|'political'|'jurisdiction'|'security'}`,
+          content: buildArticleScoringPrompt(profile, articles),
         },
       ],
       model: "claude-sonnet-4-6",
@@ -178,34 +183,63 @@ Return ONLY JSON: {score: 1-5, reason: string max 12 words, category: 'economic'
 
     const content = message.content[0];
     const rawText = content?.type === "text" ? content.text : "";
-    const parsed = parseScoredArticle(rawText);
+    const scoresByIndex = parseScoredArticles(rawText);
 
-    if (!parsed) {
-      return null;
-    }
+    return articles
+      .map((article, index) => {
+        const parsed = scoresByIndex.get(index);
 
-    const country = COUNTRIES[article.countryCode];
+        if (!parsed) {
+          return null;
+        }
 
-    return {
-      title: article.title ?? "",
-      description: article.description ?? "",
-      url: article.url ?? "",
-      source: article.source?.name ?? "Unknown source",
-      publishedAt: article.publishedAt ?? "",
-      countryCode: article.countryCode,
-      countryName: country.name,
-      countryFlag: country.flag,
-      score: parsed.score,
-      reason: parsed.reason,
-      category: parsed.category,
-    };
+        const country = COUNTRIES[article.countryCode];
+
+        return {
+          title: article.title ?? "",
+          description: article.description ?? "",
+          url: article.url ?? "",
+          source: article.source?.name ?? "Unknown source",
+          publishedAt: article.publishedAt ?? "",
+          countryCode: article.countryCode,
+          countryName: country.name,
+          countryFlag: country.flag,
+          score: parsed.score,
+          reason: parsed.reason,
+          category: parsed.category,
+        };
+      })
+      .filter((signal): signal is NonNullable<typeof signal> =>
+        Boolean(signal),
+      );
   } catch (error) {
-    console.error("Article scoring failed:", error);
-    return null;
+    console.error("Article batch scoring failed:", error);
+    return [];
   }
 }
 
-function parseScoredArticle(rawText: string): ScoredArticle | null {
+function buildArticleScoringPrompt(
+  profile: CompanyProfile,
+  articles: TaggedArticle[],
+) {
+  const articleLines = articles
+    .map(
+      (article, index) =>
+        `${index}. [${article.countryCode}] ${article.title ?? "Untitled"}`,
+    )
+    .join("\n");
+
+  return `Company: ${profile.company_name}. Industry: ${profile.industry_vertical}. Key assets: ${profile.key_assets ?? "Not specified"}. Supply chain: ${profile.supply_chain ?? "Not specified"}.
+Rate relevance of ALL article headlines below to this company's risk exposure.
+
+ARTICLES:
+${articleLines}
+
+Return ONLY a JSON array with one object per article, preserving each zero-based index:
+[{ "index": number, "score": 1-5, "reason": "string max 12 words", "category": "economic|political|jurisdiction|security" }]`;
+}
+
+function parseScoredArticles(rawText: string) {
   const cleanedText = rawText
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
@@ -213,32 +247,61 @@ function parseScoredArticle(rawText: string): ScoredArticle | null {
     .trim();
 
   try {
-    const parsed = JSON.parse(cleanedText) as Partial<ScoredArticle>;
-    const score =
-      typeof parsed.score === "number"
-        ? parsed.score
-        : Number.parseInt(String(parsed.score), 10);
-    const category = parsed.category;
+    const parsed = JSON.parse(cleanedText) as unknown;
 
-    if (
-      !Number.isFinite(score) ||
-      score < 1 ||
-      score > 5 ||
-      typeof parsed.reason !== "string" ||
-      !isSignalCategory(category)
-    ) {
-      return null;
+    if (!Array.isArray(parsed)) {
+      return new Map<number, ScoredArticle>();
     }
 
-    return {
-      score,
-      reason: limitWords(parsed.reason, 12),
-      category,
-    };
+    return parsed.reduce((scoresByIndex, item) => {
+      const scoredArticle = parseScoredArticleItem(item);
+
+      if (scoredArticle) {
+        scoresByIndex.set(scoredArticle.index, scoredArticle);
+      }
+
+      return scoresByIndex;
+    }, new Map<number, ScoredArticle>());
   } catch {
-    console.error("Failed to parse signal relevance JSON:", rawText);
+    console.error("Failed to parse signal relevance JSON array:", rawText);
+    return new Map<number, ScoredArticle>();
+  }
+}
+
+function parseScoredArticleItem(item: unknown): BatchScoredArticle | null {
+  if (!item || typeof item !== "object") {
     return null;
   }
+
+  const parsed = item as Partial<BatchScoredArticle>;
+  const index =
+    typeof parsed.index === "number"
+      ? parsed.index
+      : Number.parseInt(String(parsed.index), 10);
+  const score =
+    typeof parsed.score === "number"
+      ? parsed.score
+      : Number.parseInt(String(parsed.score), 10);
+  const category = parsed.category;
+
+  if (
+    !Number.isInteger(index) ||
+    index < 0 ||
+    !Number.isFinite(score) ||
+    score < 1 ||
+    score > 5 ||
+    typeof parsed.reason !== "string" ||
+    !isSignalCategory(category)
+  ) {
+    return null;
+  }
+
+  return {
+    index,
+    score,
+    reason: limitWords(parsed.reason, 12),
+    category,
+  };
 }
 
 function limitWords(value: string, maxWords: number) {
