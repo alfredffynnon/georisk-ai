@@ -40,6 +40,7 @@ const signalCategories = [
 export async function GET() {
   try {
     if (!process.env.NEWSAPI_KEY || !process.env.ANTHROPIC_API_KEY) {
+      console.error("Signal intelligence is not configured.");
       return NextResponse.json(
         { error: "Signal intelligence is not configured." },
         { status: 500 },
@@ -53,6 +54,7 @@ export async function GET() {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error("Signal feed unauthorized:", authError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -68,7 +70,7 @@ export async function GET() {
     }
 
     if (!profile) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ signals: [] });
     }
 
     const companyProfile = profile as CompanyProfile;
