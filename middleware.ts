@@ -1,117 +1,49 @@
-import { createServerClient } from "@supabase/ssr";
-import { type NextRequest, NextResponse } from "next/server";
-
-import {
-  getSupabaseConfig,
-  hasSupabaseConfig,
-} from "@/lib/supabase/config";
-
-const PROTECTED_ROUTE_PREFIXES = [
-  "/dashboard",
-  "/alerts",
-  "/onboarding",
-  "/experts",
-] as const;
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
-  const isProtectedRoute = isProtectedPath(pathname);
-  const isDashboardRoute = matchesRoutePrefix(pathname, "/dashboard");
-  const isOnboardingRoute = matchesRoutePrefix(pathname, "/onboarding");
+  let supabaseResponse = NextResponse.next({ request })
 
-  if (!hasSupabaseConfig()) {
-    return isProtectedRoute ? redirectToLogin(request) : NextResponse.next();
-  }
-
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
-  const { supabaseKey, supabaseUrl } = getSupabaseConfig();
-  const supabase = createServerClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
       },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => {
-          request.cookies.set(name, value);
-        });
+    }
+  )
 
-        supabaseResponse = NextResponse.next({
-          request,
-        });
+  const { data: { user } } = await supabase.auth.getUser()
 
-        cookiesToSet.forEach(({ name, options, value }) => {
-          supabaseResponse.cookies.set(name, value, options);
-        });
-      },
-    },
-  });
+  const { pathname } = request.nextUrl
+  const isProtected =
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/alerts') ||
+    pathname.startsWith('/experts')
 
-  const { data, error } = await supabase.auth.getClaims();
-
-  if (isProtectedRoute && (error || !data?.claims)) {
-    return redirectToLogin(request);
+  if (!user && isProtected) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/login'
+    return NextResponse.redirect(url)
   }
 
-  if (data?.claims && (isDashboardRoute || isOnboardingRoute)) {
-    const userId =
-      typeof data.claims.sub === "string" ? data.claims.sub : null;
-
-    if (!userId) {
-      return redirectToLogin(request);
-    }
-
-    const { data: companyProfile, error: companyProfileError } = await supabase
-      .from("company_profiles")
-      .select("id")
-      .eq("user_id", userId)
-      .limit(1)
-      .maybeSingle();
-
-    if (!companyProfileError) {
-      if (isDashboardRoute && !companyProfile) {
-        return redirectToPath(request, "/onboarding");
-      }
-
-      if (isOnboardingRoute && companyProfile) {
-        return redirectToPath(request, "/dashboard");
-      }
-    }
-  }
-
-  return supabaseResponse;
+  // CRITICAL: must return supabaseResponse so refreshed cookies are sent to browser
+  return supabaseResponse
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
-};
-
-function isProtectedPath(pathname: string) {
-  return PROTECTED_ROUTE_PREFIXES.some((prefix) =>
-    matchesRoutePrefix(pathname, prefix)
-  );
-}
-
-function matchesRoutePrefix(pathname: string, prefix: string) {
-  return pathname === prefix || pathname.startsWith(`${prefix}/`);
-}
-
-function redirectToLogin(request: NextRequest) {
-  const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = "/auth/login";
-  redirectUrl.searchParams.set("redirectedFrom", request.nextUrl.pathname);
-
-  return NextResponse.redirect(redirectUrl);
-}
-
-function redirectToPath(request: NextRequest, pathname: string) {
-  const redirectUrl = request.nextUrl.clone();
-  redirectUrl.pathname = pathname;
-  redirectUrl.search = "";
-
-  return NextResponse.redirect(redirectUrl);
+  matcher: ['/dashboard/:path*', '/onboarding/:path*', '/alerts/:path*', '/experts/:path*'],
 }
