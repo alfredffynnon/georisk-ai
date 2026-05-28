@@ -239,6 +239,7 @@ function parseBriefContent(rawText: string): BriefContent | null {
 
 function cleanJsonText(rawText: string) {
   return rawText
+    .trim()
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
     .replace(/```\s*$/i, "")
