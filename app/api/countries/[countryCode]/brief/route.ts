@@ -14,6 +14,9 @@ import type { BriefContent, CompanyProfile } from "@/lib/types";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
+const NEWS_ARTICLE_PAGE_SIZE = 5;
+const NEWS_API_TIMEOUT_MS = 20000;
+
 type CountryBriefRouteProps = {
   params: {
     countryCode: string;
@@ -70,7 +73,7 @@ export async function POST(
     }
 
     const [articles, indicators] = await Promise.all([
-      fetchRecentCountryArticles(countryCode, 15, 48),
+      fetchBriefArticles(countryCode),
       fetchWorldBankEconomicIndicators(countryCode),
     ]);
 
@@ -80,7 +83,7 @@ export async function POST(
     });
 
     const message = await anthropic.messages.create({
-      max_tokens: 4096,
+      max_tokens: 2000,
       messages: [
         {
           role: "user",
@@ -136,6 +139,30 @@ export async function POST(
       { error: "Brief generation failed." },
       { status: 500 },
     );
+  }
+}
+
+async function fetchBriefArticles(countryCode: CountryCode) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    const result = await Promise.race([
+      fetchRecentCountryArticles(countryCode, NEWS_ARTICLE_PAGE_SIZE, 48).then(
+        (articles) => ({ articles }),
+      ),
+      new Promise<{ articles: NewsApiArticle[] }>((resolve) => {
+        timeoutId = setTimeout(
+          () => resolve({ articles: [] }),
+          NEWS_API_TIMEOUT_MS,
+        );
+      }),
+    ]);
+
+    return result.articles;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
